@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -10,11 +11,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Flutter API Demo',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Running Total Counter'),
     );
   }
 }
@@ -29,18 +30,48 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
+  bool _isLoading = false;
 
-  void _incrementCounter() {
+  // Send increment to server and get running total
+  Future<void> _incrementCounter() async {
     setState(() {
-      _counter++;
+      _isLoading = true;
     });
+
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.1.126:8080'),
+        body: {'number': '1'},
+      );
+
+      if (response.statusCode == 200) {
+        final responseBody = response.body;
+        if (responseBody.startsWith('total:')) {
+          final newTotal = int.parse(responseBody.split(':')[1]);
+          setState(() {
+            _counter = newTotal;
+          });
+        } else {
+          print('Error from server: $responseBody');
+        }
+      } else {
+        print('HTTP error: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
+  // Reset local counter
   void _resetCounter() {
-  setState(() {
-    _counter = 0;
-  });
-}
+    setState(() {
+      _counter = 0;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +84,13 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
+            const Text('Server Running Total:'),
+            _isLoading
+                ? const CircularProgressIndicator()
+                : Text(
+                    '$_counter',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
           ],
         ),
       ),
@@ -65,19 +98,19 @@ class _MyHomePageState extends State<MyHomePage> {
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           FloatingActionButton(
-            onPressed: _incrementCounter,
+            onPressed: _isLoading ? null : _incrementCounter,
             tooltip: 'Increment',
             child: const Icon(Icons.add),
           ),
           const SizedBox(height: 10),
           FloatingActionButton(
             onPressed: _resetCounter,
-            tooltip: 'Reset',
+            tooltip: 'Reset Local',
             backgroundColor: Colors.red,
             child: const Icon(Icons.refresh),
           ),
         ],
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 }
