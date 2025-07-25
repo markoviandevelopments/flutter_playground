@@ -23,6 +23,14 @@ def handle_client(client_socket):
                 client_socket.send(response.encode('utf-8'))
             except (ValueError, IndexError):
                 client_socket.send("error:Invalid number".encode('utf-8'))
+        elif data.startswith("request:"):
+            try:
+                number = int(data.split(":")[1])
+                with lock:
+                    response = f"total:{running_total}"
+                client_socket.send(response.encode('utf-8'))
+            except (ValueError, IndexError):
+                client_socket.send("error:Invalid number".encode('utf-8'))
         else:
             client_socket.send("error:Invalid format".encode('utf-8'))
     except Exception as e:

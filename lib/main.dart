@@ -78,6 +78,43 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  Future<void> _checkTotal() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    Socket? socket;
+    try {
+      // Connect to the socket server
+      socket = await Socket.connect('192.168.1.126', 5072);
+      
+      // Send data in the expected format
+      socket.write('request:1\n');  // Add newline for proper termination
+      
+      // Listen for response
+      final response = await socket.first.timeout(const Duration(seconds: 5));
+      final responseString = utf8.decode(response).trim();
+      
+      if (responseString.startsWith('total:')) {
+        final newTotal = int.parse(responseString.split(':')[1]);
+        setState(() {
+          _counter = newTotal;
+        });
+      } else {
+        print('Error from server: $responseString');
+      }
+    } catch (e) {
+      print('Socket error: $e');
+      // Optionally show a snackbar or dialog for user feedback
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      socket?.destroy();  // Close the socket
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -113,6 +150,13 @@ class _MyHomePageState extends State<MyHomePage> {
             tooltip: 'Reset Local',
             backgroundColor: Colors.red,
             child: const Icon(Icons.refresh),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            onPressed: _checkTotal,
+            tooltip: 'Check Running Total',
+            backgroundColor: Colors.pink,
+            child: const Icon(Icons.rowing),
           ),
         ],
       ),
