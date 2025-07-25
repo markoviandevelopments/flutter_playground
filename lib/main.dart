@@ -1,5 +1,6 @@
+import 'dart:io';  // For Socket
+import 'dart:convert';  // For UTF-8 encoding/decoding
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 void main() {
   runApp(const MyApp());
@@ -32,34 +33,38 @@ class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
   bool _isLoading = false;
 
-  // Send increment to server and get running total
+  // Send increment to server via raw socket and get running total
   Future<void> _incrementCounter() async {
     setState(() {
       _isLoading = true;
     });
 
+    Socket? socket;
     try {
-      final response = await http.post(
-        Uri.parse('http://192.168.1.126:8080'),
-        body: {'number': '1'},
-      );
-
-      if (response.statusCode == 200) {
-        final responseBody = response.body;
-        if (responseBody.startsWith('total:')) {
-          final newTotal = int.parse(responseBody.split(':')[1]);
-          setState(() {
-            _counter = newTotal;
-          });
-        } else {
-          print('Error from server: $responseBody');
-        }
+      // Connect to the socket server
+      socket = await Socket.connect('192.168.1.126', 5072);
+      
+      // Send data in the expected format
+      socket.write('number:1\n');  // Add newline for proper termination
+      
+      // Listen for response
+      final response = await socket.first.timeout(const Duration(seconds: 5));
+      final responseString = utf8.decode(response).trim();
+      
+      if (responseString.startsWith('total:')) {
+        final newTotal = int.parse(responseString.split(':')[1]);
+        setState(() {
+          _counter = newTotal;
+        });
       } else {
-        print('HTTP error: ${response.statusCode}');
+        print('Error from server: $responseString');
       }
     } catch (e) {
-      print('Error: $e');
+      print('Socket error: $e');
+      // Optionally show a snackbar or dialog for user feedback
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
+      socket?.destroy();  // Close the socket
       setState(() {
         _isLoading = false;
       });
